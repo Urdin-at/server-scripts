@@ -8,8 +8,13 @@
 #   - выводит список зарегистрированных ключей;
 #   - добавляет новый ключ (проверяет дубликаты).
 #
-# Настройки: не требуются. Пути стандартные: ~/.ssh/authorized_keys для
-#   пользователя и /root/.ssh/authorized_keys для root.
+# Настройки:
+#   Вшитый ключ (пункт меню 6) — переменная embedded_key в функции
+#   add_embedded_key(). По умолчанию там ЗАГЛУШКА
+#   (REPLACE_WITH_YOUR_PUBLIC_KEY): впишите свой публичный ключ одной строкой,
+#   иначе скрипт откажется добавлять его и подскажет, что заменить.
+#   Пути стандартные: ~/.ssh/authorized_keys для пользователя и
+#   /root/.ssh/authorized_keys для root — отдельных настроек не требуют.
 #
 # Требования: bash; права root для изменения настроек sshd и ключей root.
 #
@@ -126,6 +131,33 @@ add_ssh_key() {
 }
 
 
+
+# Функция для добавления ключа, вшитого в скрипт (см. «Настройки» в шапке)
+add_embedded_key() {
+    local user=$1
+    local ssh_dir="/home/$user/.ssh"
+    if [[ "$user" == "root" ]]; then
+        ssh_dir="/root/.ssh"
+    fi
+
+    # ЗАГЛУШКА: впишите сюда свой публичный SSH-ключ одной строкой
+    # (содержимое файла ~/.ssh/id_ed25519.pub или аналогичного).
+    local embedded_key="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI REPLACE_WITH_YOUR_PUBLIC_KEY your-name@example.com"
+
+    if [[ "$embedded_key" == *REPLACE_WITH_YOUR_PUBLIC_KEY* ]]; then
+        ui_err "Ключ не задан: впишите свой публичный ключ в переменную embedded_key"
+        ui_info "Функция add_embedded_key(), строка с REPLACE_WITH_YOUR_PUBLIC_KEY"
+        return 1
+    fi
+
+    if is_key_duplicate "$user" "$embedded_key"; then
+        ui_err "Ошибка: Вшитый ключ уже добавлен для пользователя $user."
+    else
+        printf '%s\n' "$embedded_key" >> "$ssh_dir/authorized_keys"
+        ui_ok "Вшитый ключ добавлен для пользователя $user."
+    fi
+}
+
 # Основное меню
 while true; do
     ui_title "УПРАВЛЕНИЕ SSH-КЛЮЧАМИ"
@@ -134,9 +166,10 @@ while true; do
     ui_item 3 "Включить авторизацию по ключу для root пользователя"
     ui_item 4 "Вывести список зарегистрированных ключей"
     ui_item 5 "Добавить новый ключ"
+    ui_item 6 "Добавить вшитый ключ (задан в настройках скрипта)"
     ui_item 0 "Выход"
     echo
-    ui_ask 5
+    ui_ask 6
     read -r choice
 
     case "$choice" in
@@ -160,6 +193,10 @@ while true; do
             ;;
         5)
             add_ssh_key "$(whoami)"
+            ui_pause
+            ;;
+        6)
+            add_embedded_key "$(whoami)"
             ui_pause
             ;;
         0)
